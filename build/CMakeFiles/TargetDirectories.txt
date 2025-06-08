@@ -1,0 +1,13 @@
+/Users/erolatik/tez/backend/build/CMakeFiles/ppe_bridge.dir
+/Users/erolatik/tez/backend/build/CMakeFiles/edit_cache.dir
+/Users/erolatik/tez/backend/build/CMakeFiles/rebuild_cache.dir
+/Users/erolatik/tez/backend/build/CMakeFiles/list_install_components.dir
+/Users/erolatik/tez/backend/build/CMakeFiles/install.dir
+/Users/erolatik/tez/backend/build/CMakeFiles/install/local.dir
+/Users/erolatik/tez/backend/build/CMakeFiles/install/strip.dir
+/Users/erolatik/tez/backend/build/_deps/httplib-build/CMakeFiles/edit_cache.dir
+/Users/erolatik/tez/backend/build/_deps/httplib-build/CMakeFiles/rebuild_cache.dir
+/Users/erolatik/tez/backend/build/_deps/httplib-build/CMakeFiles/list_install_components.dir
+/Users/erolatik/tez/backend/build/_deps/httplib-build/CMakeFiles/install.dir
+/Users/erolatik/tez/backend/build/_deps/httplib-build/CMakeFiles/install/local.dir
+/Users/erolatik/tez/backend/build/_deps/httplib-build/CMakeFiles/install/strip.dir

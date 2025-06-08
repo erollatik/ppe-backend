@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/erolatik/tez/backend/build/_deps/httplib-subbuild/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

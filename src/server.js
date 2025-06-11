@@ -63,7 +63,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 server.listen(PORT, () => {
   console.log(`🚀 Server ${PORT} portunda çalışıyor`);
@@ -71,3 +71,23 @@ server.listen(PORT, () => {
 });
 
 module.exports = { app, io };
+
+// Socket.IO bağlantı yönetimi
+io.on('connection', (socket) => {
+  console.log('🔗 Frontend bağlandı:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('❌ Frontend bağlantısı kesildi:', socket.id);
+  });
+  
+  // Test mesajı gönder
+  socket.emit('connection_status', { 
+    status: 'connected', 
+    message: 'Backend bağlantısı başarılı' 
+  });
+});
+
+// PPE detection sonuçlarını broadcast et (gelecekte kullanılacak)
+function broadcastDetection(detection) {
+  io.emit('detection_result', detection);
+}

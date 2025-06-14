@@ -1,0 +1,238 @@
+const axios = require('axios');
+
+class CppBridge {
+    constructor() {
+        this.cppServerUrl = 'http://localhost:8080';
+        this.isConnected = false;
+        this.detectionActive = false;
+        this.lastDetections = [];
+        
+        // Bağlantıyı kontrol et
+        this.checkConnection();
+        
+        // Periyodik bağlantı kontrolü
+        setInterval(() => this.checkConnection(), 5000);
+    }
+    
+    // ✅ C++ Server bağlantı kontrolü
+    async checkConnection() {
+        try {
+            const response = await axios.get(`${this.cppServerUrl}/health`, { 
+                timeout: 2000 
+            });
+            
+            if (!this.isConnected) {
+                console.log('✅ C++ Server bağlantısı kuruldu');
+            }
+            this.isConnected = true;
+            return true;
+        } catch (error) {
+            if (this.isConnected) {
+                console.log('❌ C++ Server bağlantısı kesildi');
+            }
+            this.isConnected = false;
+            return false;
+        }
+    }
+    
+    // ✅ PPE Detection başlat
+    async startMonitoring(options = {}) {
+        if (!this.isConnected) {
+            throw new Error('C++ Server bağlantısı yok');
+        }
+        
+        try {
+            const payload = {
+                camera_index: options.cameraIndex || 0,
+                model_path: options.modelPath || "./model/yolo_model.onnx",
+                confidence_threshold: options.confidence || 0.5,
+                use_camera: options.useCamera || true
+            };
+            
+            console.log('🎬 C++ Detection başlatılıyor...', payload);
+            
+            const response = await axios.post(
+                `${this.cppServerUrl}/api/detection/start`, 
+                payload,
+                { timeout: 5000 }
+            );
+            
+            this.detectionActive = true;
+            console.log('✅ C++ Detection başlatıldı:', response.data);
+            
+            return {
+                success: true,
+                message: 'Detection başlatıldı',
+                data: response.data
+            };
+        } catch (error) {
+            console.error('❌ C++ Detection başlatma hatası:', error.message);
+            throw error;
+        }
+    }
+    
+    // ✅ PPE Detection durdur
+    async stopMonitoring() {
+        if (!this.isConnected) {
+            return { success: false, message: 'C++ Server bağlantısı yok' };
+        }
+        
+        try {
+            console.log('⏹️ C++ Detection durduruluyor...');
+            
+            const response = await axios.post(
+                `${this.cppServerUrl}/api/detection/stop`,
+                {},
+                { timeout: 3000 }
+            );
+            
+            this.detectionActive = false;
+            this.lastDetections = [];
+            console.log('✅ C++ Detection durduruldu');
+            
+            return {
+                success: true,
+                message: 'Detection durduruldu',
+                data: response.data
+            };
+        } catch (error) {
+            console.error('❌ C++ Detection durdurma hatası:', error.message);
+            return {
+                success: false,
+                message: error.message
+            };
+        }
+    }
+    
+    // ✅ Gerçek zamanlı detection sonuçları al
+    async getDetections() {
+        if (!this.isConnected || !this.detectionActive) {
+            return {
+                success: true,
+                data: { detections: [] }
+            };
+        }
+        
+        try {
+            const response = await axios.get(
+                `${this.cppServerUrl}/api/detection/results`,
+                { timeout: 1000 }
+            );
+            
+            // Detection formatını normalize et
+            const detections = this.normalizeDetections(response.data.detections || []);
+            this.lastDetections = detections;
+            
+            return {
+                success: true,
+                data: { 
+                    detections,
+                    timestamp: new Date().toISOString()
+                }
+            };
+        } catch (error) {
+            console.error('❌ Detection sonuçları alma hatası:', error.message);
+            return {
+                success: true,
+                data: { detections: this.lastDetections }
+            };
+        }
+    }
+    
+    // ✅ Detection formatını normalize et
+    normalizeDetections(rawDetections) {
+        return rawDetections.map(detection => ({
+            id: detection.id || `det_${Date.now()}_${Math.random()}`,
+            track_id: detection.track_id || detection.person_id || 1,
+            worker_id: detection.worker_id || `W${detection.track_id || 1}`,
+            has_helmet: detection.has_helmet !== undefined ? detection.has_helmet : detection.helmet_detected,
+            confidence: detection.confidence || 0.8,
+            bbox: {
+                x: detection.bbox?.x || detection.x || 0,
+                y: detection.bbox?.y || detection.y || 0,
+                width: detection.bbox?.width || detection.w || 100,
+                height: detection.bbox?.height || detection.h || 100
+            },
+            timestamp: detection.timestamp || new Date().toISOString(),
+            safety_status: detection.has_helmet ? 'safe' : 'danger'
+        }));
+    }
+    
+    // ✅ İstatistikler al
+    async getStats() {
+        if (!this.isConnected) {
+            return {
+                success: false,
+                message: 'C++ Server bağlantısı yok'
+            };
+        }
+        
+        try {
+            const response = await axios.get(
+                `${this.cppServerUrl}/api/stats`,
+                { timeout: 2000 }
+            );
+            
+            return {
+                success: true,
+                data: {
+                    active_workers: response.data.active_workers || 0,
+                    today_violations: response.data.today_violations || 0,
+                    daily_stats: {
+                        total_detections: response.data.total_detections || 0,
+                        safe_detections: response.data.safe_detections || 0,
+                        violations: response.data.violations || 0,
+                        compliance_rate: response.data.compliance_rate || 100
+                    }
+                }
+            };
+        } catch (error) {
+            console.error('❌ Stats alma hatası:', error.message);
+            return {
+                success: false,
+                message: error.message
+            };
+        }
+    }
+    
+    // ✅ Frame gönder (kamera görüntüsü)
+    async sendFrame(frameBlob) {
+        if (!this.isConnected || !this.detectionActive) {
+            return { success: false, message: 'Detection aktif değil' };
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('frame', frameBlob, 'frame.jpg');
+            
+            const response = await axios.post(
+                `${this.cppServerUrl}/api/detection/frame`,
+                formData,
+                {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    timeout: 2000
+                }
+            );
+            
+            return {
+                success: true,
+                detections: this.normalizeDetections(response.data.detections || [])
+            };
+        } catch (error) {
+            console.error('❌ Frame gönderme hatası:', error.message);
+            return { success: false, message: error.message };
+        }
+    }
+    
+    // ✅ Durum bilgisi
+    getStatus() {
+        return {
+            connected: this.isConnected,
+            detecting: this.detectionActive,
+            serverUrl: this.cppServerUrl,
+            lastDetectionCount: this.lastDetections.length
+        };
+    }
+}
+
+module.exports = new CppBridge();

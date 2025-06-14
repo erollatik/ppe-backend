@@ -1,6 +1,8 @@
 const express = require("express");
 const ppeController = require("../controllers/ppeController");
 const router = express.Router();
+const ppeService = require('../services/ppeService');
+const { Worker } = require('../models/database');
 
 // ✅ Temel monitoring route'ları
 router.post("/start-monitoring", ppeController.startMonitoring);
@@ -13,6 +15,54 @@ router.get("/camera/status", ppeController.getCameraStatus);
 // ✅ Geriye uyumluluk
 router.post("/start", ppeController.startMonitoring);
 router.post("/stop", ppeController.stopMonitoring);
+
+// ✅ Mail endpoint'leri
+router.get("/mail/status", async (req, res) => {
+  try {
+    console.log("📧 Mail durumu istendi");
+    const response = await ppeService.getMailStatus();
+    res.json(response);
+  } catch (error) {
+    console.error("❌ Mail durumu alınamadı:", error);
+    res.status(500).json({ error: "Mail durumu alınamadı" });
+  }
+});
+
+router.post("/mail/toggle", async (req, res) => {
+  try {
+    console.log("📧 Mail toggle istendi:", req.body);
+    const { enabled } = req.body;
+    const response = await ppeService.toggleMail(enabled);
+    res.json(response);
+  } catch (error) {
+    console.error("❌ Mail toggle hatası:", error);
+    res.status(500).json({ error: "Mail ayarı değiştirilemedi" });
+  }
+});
+
+router.post("/mail/set-recipient", async (req, res) => {
+  try {
+    console.log("📧 Mail alıcısı ayarlanıyor:", req.body);
+    const { email } = req.body;
+    const response = await ppeService.setMailRecipient(email);
+    res.json(response);
+  } catch (error) {
+    console.error("❌ Mail alıcısı ayarlanamadı:", error);
+    res.status(500).json({ error: "Mail alıcısı ayarlanamadı" });
+  }
+});
+
+router.post("/mail/send", async (req, res) => {
+  try {
+    console.log("📧 Manuel mail gönderimi istendi");
+    const response = await ppeService.sendMail();
+    res.json(response);
+  } catch (error) {
+    console.error("❌ Mail gönderilemedi:", error);
+    res.status(500).json({ error: "Mail gönderilemedi" });
+  }
+});
+
 // ================================
 // ✅ DAILY STATS ENDPOINT
 // ================================
@@ -406,73 +456,45 @@ router.get("/statistics", async (req, res) => {
   }
 });
 
-router.get("/workers", async (req, res) => {
-  try {
-    const workers = [
-      {
-        id: 1,
-        name: "Ahmet Yılmaz",
-        department: "Üretim",
-        status: "active",
-        lastSeen: new Date().toISOString(),
-        complianceRate: 95,
-      },
-      {
-        id: 2,
-        name: "Mehmet Kaya",
-        department: "Montaj",
-        status: "active",
-        lastSeen: new Date().toISOString(),
-        complianceRate: 88,
-      },
-    ];
-    res.json(workers);
-  } catch (error) {
-    res.status(500).json({ error: "Çalışan verisi alınamadı" });
-  }
-});
+// ================================
+// WORKERS ENDPOINTS
+// ================================
+
+// Departmanları getir
 router.get("/departments", (req, res) => {
   console.log("🏢 Departments istendi");
-
-  const mockDepartments = [
-    { id: 1, name: "Üretim", code: "PROD" },
-    { id: 2, name: "Kalite Kontrol", code: "QC" },
-    { id: 3, name: "Bakım-Onarım", code: "MAINT" },
-    { id: 4, name: "Depo", code: "WAREHOUSE" },
-    { id: 5, name: "İnsan Kaynakları", code: "HR" },
-    { id: 6, name: "Güvenlik", code: "SECURITY" },
+  
+  const departments = [
+    "Üretim",
+    "Kalite Kontrol", 
+    "Bakım-Onarım",
+    "Depo",
+    "Güvenlik",
+    "İnsan Kaynakları"
   ];
-
-  // Frontend sadece name array'i bekliyor
-  const departmentNames = mockDepartments.map((dept) => dept.name);
-
-  console.log("✅ Departments gönderiliyor:", departmentNames.length, "adet");
-  res.json(departmentNames);
+  
+  console.log("✅ Departments gönderiliyor");
+  res.json(departments);
 });
 
-// 2. Lokasyonları getir
+// Lokasyonları getir
 router.get("/locations", (req, res) => {
   console.log("📍 Locations istendi");
-
-  const mockLocations = [
-    { id: 1, name: "Ana Üretim Hattı", code: "MAIN_LINE" },
-    { id: 2, name: "Montaj Alanı", code: "ASSEMBLY" },
-    { id: 3, name: "Kalite Laboratuvarı", code: "QC_LAB" },
-    { id: 4, name: "Hammadde Deposu", code: "RAW_STORAGE" },
-    { id: 5, name: "Mamul Deposu", code: "FINISHED_STORAGE" },
-    { id: 6, name: "Bakım Atölyesi", code: "MAINTENANCE_SHOP" },
-    { id: 7, name: "Ofis Alanı", code: "OFFICE" },
-    { id: 8, name: "Yemekhane", code: "CAFETERIA" },
+  
+  const locations = [
+    "Ana Üretim Hattı",
+    "Montaj Alanı", 
+    "Kalite Laboratuvarı",
+    "Depo Alanları",
+    "Bakım Atölyesi",
+    "Ofis Alanları"
   ];
-
-  // Frontend sadece name array'i bekliyor
-  const locationNames = mockLocations.map((loc) => loc.name);
-
-  console.log("✅ Locations gönderiliyor:", locationNames.length, "adet");
-  res.json(locationNames);
+  
+  console.log("✅ Locations gönderiliyor");
+  res.json(locations);
 });
 
-// 3. Çalışan istatistiklerini getir
+// Çalışan istatistiklerini getir
 router.get("/workers/statistics", (req, res) => {
   console.log("📊 Worker statistics istendi");
 
@@ -502,403 +524,7 @@ router.get("/workers/statistics", (req, res) => {
   res.json(mockStats);
 });
 
-// 4. Tüm çalışanları getir
-router.get("/workers", (req, res) => {
-  console.log("👥 Workers listesi istendi");
-
-  const mockWorkers = [
-    {
-      id: 1,
-      name: "Ahmet Yılmaz",
-      workerId: "EMP001",
-      email: "ahmet.yilmaz@sirket.com",
-      phone: "+90 555 123 45 67",
-      department: "Üretim",
-      location: "Ana Üretim Hattı",
-      position: "Üretim Operatörü",
-      startDate: "2023-01-15",
-      status: "active",
-      managerId: 1,
-      complianceRate: 92.5,
-      monthlyViolations: 2,
-      recentViolations: 1,
-      lastSeen: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 saat önce
-      safetyScore: 85,
-      trainingStatus: "completed",
-      completedTrainings: 8,
-      notes: "Güvenilir çalışan, PPE kullanımında dikkatli.",
-      photo: null,
-      assignedPPE: [
-        {
-          type: "Baret",
-          status: "assigned",
-          assignedDate: "2023-01-15",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-        {
-          type: "Gözlük",
-          status: "assigned",
-          assignedDate: "2023-01-15",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-        {
-          type: "Eldiven",
-          status: "assigned",
-          assignedDate: "2023-01-15",
-          lastCheck: "2025-06-01",
-          condition: "fair",
-        },
-        {
-          type: "Yelek",
-          status: "assigned",
-          assignedDate: "2023-01-15",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-      ],
-      recentViolations: [
-        {
-          id: 1,
-          type: "Eksik PPE",
-          description: "Güvenlik gözlüğü takılmamış",
-          timestamp: new Date(
-            Date.now() - 3 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          location: "Ana Üretim Hattı",
-          status: "resolved",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Fatma Demir",
-      workerId: "EMP002",
-      email: "fatma.demir@sirket.com",
-      phone: "+90 555 234 56 78",
-      department: "Kalite Kontrol",
-      location: "Kalite Laboratuvarı",
-      position: "Kalite Kontrol Uzmanı",
-      startDate: "2022-08-20",
-      status: "active",
-      managerId: 2,
-      complianceRate: 98.1,
-      monthlyViolations: 0,
-      recentViolations: 0,
-      lastSeen: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 dk önce
-      safetyScore: 95,
-      trainingStatus: "completed",
-      completedTrainings: 12,
-      notes: "Örnek çalışan, güvenlik konularında lider.",
-      photo: null,
-      assignedPPE: [
-        {
-          type: "Baret",
-          status: "assigned",
-          assignedDate: "2022-08-20",
-          lastCheck: "2025-06-01",
-          condition: "excellent",
-        },
-        {
-          type: "Gözlük",
-          status: "assigned",
-          assignedDate: "2022-08-20",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-        {
-          type: "Eldiven",
-          status: "assigned",
-          assignedDate: "2022-08-20",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-        {
-          type: "Maske",
-          status: "assigned",
-          assignedDate: "2022-08-20",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-      ],
-      recentViolations: [],
-    },
-    {
-      id: 3,
-      name: "Mehmet Kaya",
-      workerId: "EMP003",
-      email: "mehmet.kaya@sirket.com",
-      phone: "+90 555 345 67 89",
-      department: "Bakım-Onarım",
-      location: "Bakım Atölyesi",
-      position: "Bakım Teknisyeni",
-      startDate: "2023-03-10",
-      status: "active",
-      managerId: 3,
-      complianceRate: 78.3,
-      monthlyViolations: 5,
-      recentViolations: 3,
-      lastSeen: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 dk önce
-      safetyScore: 65,
-      trainingStatus: "in-progress",
-      completedTrainings: 4,
-      notes: "Güvenlik eğitimi gerekiyor, PPE kullanımında eksikler var.",
-      photo: null,
-      assignedPPE: [
-        {
-          type: "Baret",
-          status: "assigned",
-          assignedDate: "2023-03-10",
-          lastCheck: "2025-05-15",
-          condition: "fair",
-        },
-        {
-          type: "Eldiven",
-          status: "missing",
-          assignedDate: "2023-03-10",
-          lastCheck: "2025-05-15",
-          condition: "poor",
-        },
-        {
-          type: "Ayakkabı",
-          status: "assigned",
-          assignedDate: "2023-03-10",
-          lastCheck: "2025-05-15",
-          condition: "good",
-        },
-      ],
-      recentViolations: [
-        {
-          id: 2,
-          type: "Eksik PPE",
-          description: "İş eldiveni takılmamış",
-          timestamp: new Date(
-            Date.now() - 1 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          location: "Bakım Atölyesi",
-          status: "open",
-        },
-        {
-          id: 3,
-          type: "Yanlış PPE",
-          description: "Uygun olmayan ayakkabı",
-          timestamp: new Date(
-            Date.now() - 2 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          location: "Bakım Atölyesi",
-          status: "resolved",
-        },
-      ],
-    },
-    {
-      id: 4,
-      name: "Ayşe Çelik",
-      workerId: "EMP004",
-      email: "ayse.celik@sirket.com",
-      phone: "+90 555 456 78 90",
-      department: "Depo",
-      location: "Hammadde Deposu",
-      position: "Depo Sorumlusu",
-      startDate: "2023-05-22",
-      status: "active",
-      managerId: 4,
-      complianceRate: 89.7,
-      monthlyViolations: 1,
-      recentViolations: 1,
-      lastSeen: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 saat önce
-      safetyScore: 82,
-      trainingStatus: "completed",
-      completedTrainings: 6,
-      notes: "İyi performans, ara sıra hatırlatma gerekiyor.",
-      photo: null,
-      assignedPPE: [
-        {
-          type: "Baret",
-          status: "assigned",
-          assignedDate: "2023-05-22",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-        {
-          type: "Yelek",
-          status: "assigned",
-          assignedDate: "2023-05-22",
-          lastCheck: "2025-06-01",
-          condition: "excellent",
-        },
-        {
-          type: "Ayakkabı",
-          status: "assigned",
-          assignedDate: "2023-05-22",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-      ],
-      recentViolations: [
-        {
-          id: 4,
-          type: "Eksik PPE",
-          description: "Güvenlik bareti takılmamış",
-          timestamp: new Date(
-            Date.now() - 5 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          location: "Hammadde Deposu",
-          status: "resolved",
-        },
-      ],
-    },
-    {
-      id: 5,
-      name: "Can Özkan",
-      workerId: "EMP005",
-      email: "can.ozkan@sirket.com",
-      phone: "+90 555 567 89 01",
-      department: "Üretim",
-      location: "Montaj Alanı",
-      position: "Montaj Operatörü",
-      startDate: "2024-01-08",
-      status: "training",
-      managerId: 1,
-      complianceRate: 65.4,
-      monthlyViolations: 8,
-      recentViolations: 4,
-      lastSeen: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 gün önce
-      safetyScore: 45,
-      trainingStatus: "in-progress",
-      completedTrainings: 2,
-      notes: "Yeni çalışan, yoğun eğitim programında.",
-      photo: null,
-      assignedPPE: [
-        {
-          type: "Baret",
-          status: "assigned",
-          assignedDate: "2024-01-08",
-          lastCheck: "2025-06-01",
-          condition: "good",
-        },
-        {
-          type: "Gözlük",
-          status: "missing",
-          assignedDate: "2024-01-08",
-          lastCheck: "2025-05-01",
-          condition: "poor",
-        },
-        {
-          type: "Eldiven",
-          status: "assigned",
-          assignedDate: "2024-01-08",
-          lastCheck: "2025-06-01",
-          condition: "fair",
-        },
-      ],
-      recentViolations: [
-        {
-          id: 5,
-          type: "Eksik PPE",
-          description: "Güvenlik gözlüğü takılmamış",
-          timestamp: new Date(
-            Date.now() - 1 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          location: "Montaj Alanı",
-          status: "open",
-        },
-      ],
-    },
-  ];
-
-  console.log("✅ Workers gönderiliyor:", mockWorkers.length, "adet");
-  res.json(mockWorkers);
-});
-
-// 5. Yöneticileri getir (managers için)
-router.get("/workers", (req, res) => {
-  // Eğer role=manager query'si varsa sadece yöneticileri döndür
-  if (req.query.role === "manager") {
-    console.log("👔 Managers istendi");
-
-    const mockManagers = [
-      {
-        id: 1,
-        name: "Ali Veli",
-        position: "Üretim Müdürü",
-        department: "Üretim",
-      },
-      {
-        id: 2,
-        name: "Zeynep Ak",
-        position: "Kalite Müdürü",
-        department: "Kalite Kontrol",
-      },
-      {
-        id: 3,
-        name: "Hasan Öz",
-        position: "Bakım Müdürü",
-        department: "Bakım-Onarım",
-      },
-      { id: 4, name: "Elif Kara", position: "Depo Müdürü", department: "Depo" },
-    ];
-
-    console.log("✅ Managers gönderiliyor:", mockManagers.length, "adet");
-    return res.json(mockManagers);
-  }
-
-  // Normal workers endpoint'i yukarıda zaten var
-});
-
-// 6. Tekil çalışan getir
-router.get("/workers/:id", (req, res) => {
-  console.log("👤 Worker detayı istendi, ID:", req.params.id);
-
-  // Bu normalde veritabanından gelecek
-  const worker = {
-    id: parseInt(req.params.id),
-    name: "Örnek Çalışan",
-    workerId: "EMP" + req.params.id.padStart(3, "0"),
-    // ... diğer detaylar
-  };
-
-  console.log("✅ Worker detayı gönderiliyor");
-  res.json(worker);
-});
-
-// 7. Yeni çalışan ekle
-router.post("/workers", (req, res) => {
-  console.log("➕ Yeni worker ekleniyor:", req.body);
-
-  const newWorker = {
-    id: Date.now(), // Geçici ID
-    ...req.body,
-    createdAt: new Date().toISOString(),
-  };
-
-  console.log("✅ Worker eklendi:", newWorker.id);
-  res.status(201).json(newWorker);
-});
-
-// 8. Çalışan güncelle
-router.put("/workers/:id", (req, res) => {
-  console.log("✏️ Worker güncelleniyor, ID:", req.params.id, "Data:", req.body);
-
-  const updatedWorker = {
-    id: parseInt(req.params.id),
-    ...req.body,
-    updatedAt: new Date().toISOString(),
-  };
-
-  console.log("✅ Worker güncellendi");
-  res.json(updatedWorker);
-});
-
-// 9. Çalışan pasifleştir
-router.put("/workers/:id/deactivate", (req, res) => {
-  console.log("🚫 Worker pasifleştiriliyor, ID:", req.params.id);
-
-  console.log("✅ Worker pasifleştirildi");
-  res.json({ message: "Çalışan pasifleştirildi", id: req.params.id });
-});
-
-// 10. Çalışan geçmişi
+// Çalışan geçmişi
 router.get("/workers/history", (req, res) => {
   console.log("📋 Worker history istendi, params:", req.query);
 
@@ -933,7 +559,7 @@ router.get("/workers/history", (req, res) => {
   res.json(mockHistory);
 });
 
-// 11. PPE atama
+// PPE atama
 router.post("/workers/assign-ppe", (req, res) => {
   console.log("🦺 PPE atanıyor:", req.body);
 
@@ -948,34 +574,7 @@ router.post("/workers/assign-ppe", (req, res) => {
   });
 });
 
-// 12. PPE kaldır
-router.delete("/workers/:workerId/ppe/:ppeType", (req, res) => {
-  console.log("🗑️ PPE kaldırılıyor:", req.params);
-
-  console.log("✅ PPE kaldırıldı");
-  res.json({
-    message: "PPE kaldırıldı",
-    workerId: req.params.workerId,
-    ppeType: req.params.ppeType,
-  });
-});
-
-// 13. Çalışan raporu oluştur
-router.post("/workers/:id/report", (req, res) => {
-  console.log("📄 Worker raporu oluşturuluyor, ID:", req.params.id);
-
-  // Mock PDF response
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    "attachment; filename=worker-report.pdf"
-  );
-
-  console.log("✅ Worker raporu oluşturuldu");
-  res.send(Buffer.from("Mock PDF content"));
-});
-
-// 14. Çalışan dışa aktarma
+// Çalışan dışa aktarma
 router.post("/workers/export", (req, res) => {
   console.log("📊 Workers export istendi, filters:", req.body.filters);
 
@@ -990,7 +589,7 @@ router.post("/workers/export", (req, res) => {
   res.send(Buffer.from("Mock Excel content"));
 });
 
-// 15. İçe aktarma şablonu
+// İçe aktarma şablonu
 router.get("/workers/import/template", (req, res) => {
   console.log("📋 Import template istendi");
 
@@ -1008,7 +607,7 @@ router.get("/workers/import/template", (req, res) => {
   res.send(Buffer.from("Mock Excel template"));
 });
 
-// 16. İçe aktarma önizleme
+// İçe aktarma önizleme
 router.post("/workers/import/preview", (req, res) => {
   console.log("🔍 Import preview istendi");
 
@@ -1034,7 +633,7 @@ router.post("/workers/import/preview", (req, res) => {
   res.json(mockPreviewData);
 });
 
-// 17. İçe aktarma
+// İçe aktarma
 router.post("/workers/import", (req, res) => {
   console.log("📥 Workers import başlıyor:", req.body.workers?.length, "kayıt");
 
@@ -1044,6 +643,226 @@ router.post("/workers/import", (req, res) => {
     imported: req.body.workers?.length || 0,
     failed: 0,
   });
+});
+
+// Tüm çalışanları getir (role parametresi ile managers da döndürülebilir)
+router.get("/workers", async (req, res) => {
+  // Eğer role=manager query'si varsa sadece yöneticileri döndür
+  if (req.query.role === "manager") {
+    console.log("👔 Managers istendi");
+
+    const mockManagers = [
+      {
+        id: 1,
+        name: "Ali Veli",
+        position: "Üretim Müdürü",
+        department: "Üretim",
+      },
+      {
+        id: 2,
+        name: "Zeynep Ak",
+        position: "Kalite Müdürü",
+        department: "Kalite Kontrol",
+      },
+      {
+        id: 3,
+        name: "Hasan Öz",
+        position: "Bakım Müdürü",
+        department: "Bakım-Onarım",
+      },
+      { id: 4, name: "Elif Kara", position: "Depo Müdürü", department: "Depo" },
+    ];
+
+    console.log("✅ Managers gönderiliyor:", mockManagers.length, "adet");
+    return res.json(mockManagers);
+  }
+
+  console.log("👥 Workers listesi istendi");
+
+  try {
+    const workers = await Worker.findAll({
+      order: [['createdAt', 'DESC']]
+    });
+
+    console.log("✅ Workers veritabanından gönderiliyor:", workers.length, "adet");
+    return res.json(workers);
+  } catch (error) {
+    console.error("❌ Workers listesi hatası:", error);
+    // Hata durumunda boş array döndür
+    console.log("⚠️ Boş array döndürülüyor");
+    return res.json([]);
+  }
+});
+
+// Tekil çalışan getir
+router.get("/workers/:id", (req, res) => {
+  console.log("👤 Worker detayı istendi, ID:", req.params.id);
+
+  // Bu normalde veritabanından gelecek
+  const worker = {
+    id: parseInt(req.params.id),
+    name: "Örnek Çalışan",
+    workerId: "EMP" + req.params.id.padStart(3, "0"),
+    // ... diğer detaylar
+  };
+
+  console.log("✅ Worker detayı gönderiliyor");
+  res.json(worker);
+});
+
+// Yeni çalışan ekle
+router.post("/workers", async (req, res) => {
+  console.log("➕ Yeni worker ekleniyor:", req.body);
+
+  try {
+    const newWorker = await Worker.create({
+      workerId: req.body.workerId,
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      department: req.body.department,
+      position: req.body.position,
+      location: req.body.location,
+      manager: req.body.manager,
+      status: req.body.status || 'active',
+      photo: req.body.photo,
+      assignedPPE: req.body.assignedPPE || [],
+      complianceRate: Math.floor(Math.random() * 30) + 70, // 70-100 arası random
+      lastSeen: new Date(),
+      monthlyViolations: Math.floor(Math.random() * 5), // 0-4 arası random
+      totalViolations: Math.floor(Math.random() * 20), // 0-19 arası random
+      trainingCompleted: Math.random() > 0.3, // %70 ihtimalle true
+      notes: req.body.notes
+    });
+
+    console.log("✅ Worker veritabanına eklendi:", newWorker.id);
+    res.status(201).json(newWorker);
+  } catch (error) {
+    console.error("❌ Worker ekleme hatası:", error);
+    res.status(500).json({ 
+      error: "Çalışan eklenemedi", 
+      message: error.message 
+    });
+  }
+});
+
+// Çalışan güncelle
+router.put("/workers/:id", async (req, res) => {
+  console.log("✏️ Worker güncelleniyor, ID:", req.params.id, "Data:", req.body);
+
+  try {
+    const [updatedCount] = await Worker.update({
+      workerId: req.body.workerId,
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      department: req.body.department,
+      position: req.body.position,
+      location: req.body.location,
+      startDate: req.body.startDate,
+      manager: req.body.manager,
+      status: req.body.status,
+      photo: req.body.photo,
+      assignedPPE: req.body.assignedPPE,
+      notes: req.body.notes
+    }, {
+      where: { id: req.params.id }
+    });
+
+    if (updatedCount > 0) {
+      const updatedWorker = await Worker.findByPk(req.params.id);
+      console.log("✅ Worker veritabanında güncellendi:", req.params.id);
+      res.json(updatedWorker);
+    } else {
+      console.log("❌ Worker bulunamadı:", req.params.id);
+      res.status(404).json({ error: "Çalışan bulunamadı" });
+    }
+  } catch (error) {
+    console.error("❌ Worker güncelleme hatası:", error);
+    res.status(500).json({ 
+      error: "Çalışan güncellenemedi", 
+      message: error.message 
+    });
+  }
+});
+
+// Çalışan pasifleştir
+router.put("/workers/:id/deactivate", async (req, res) => {
+  console.log("🚫 Worker pasifleştiriliyor, ID:", req.params.id);
+
+  try {
+    const [updatedCount] = await Worker.update({
+      status: 'inactive'
+    }, {
+      where: { id: req.params.id }
+    });
+
+    if (updatedCount > 0) {
+      console.log("✅ Worker pasifleştirildi:", req.params.id);
+      res.json({ message: "Çalışan pasifleştirildi", id: req.params.id });
+    } else {
+      console.log("❌ Worker bulunamadı:", req.params.id);
+      res.status(404).json({ error: "Çalışan bulunamadı" });
+    }
+  } catch (error) {
+    console.error("❌ Worker pasifleştirme hatası:", error);
+    res.status(500).json({ 
+      error: "Çalışan pasifleştirilemedi", 
+      message: error.message 
+    });
+  }
+});
+
+// Çalışan sil
+router.delete("/workers/:id", async (req, res) => {
+  console.log("🗑️ Worker siliniyor, ID:", req.params.id);
+
+  try {
+    const deletedCount = await Worker.destroy({
+      where: { id: req.params.id }
+    });
+
+    if (deletedCount > 0) {
+      console.log("✅ Worker veritabanından silindi:", req.params.id);
+      res.json({ message: "Çalışan başarıyla silindi", id: req.params.id });
+    } else {
+      console.log("❌ Worker bulunamadı:", req.params.id);
+      res.status(404).json({ error: "Çalışan bulunamadı" });
+    }
+  } catch (error) {
+    console.error("❌ Worker silme hatası:", error);
+    res.status(500).json({ 
+      error: "Çalışan silinemedi", 
+      message: error.message 
+    });
+  }
+});
+
+// PPE kaldır
+router.delete("/workers/:workerId/ppe/:ppeType", (req, res) => {
+  console.log("🗑️ PPE kaldırılıyor:", req.params);
+
+  console.log("✅ PPE kaldırıldı");
+  res.json({
+    message: "PPE kaldırıldı",
+    workerId: req.params.workerId,
+    ppeType: req.params.ppeType,
+  });
+});
+
+// Çalışan raporu oluştur
+router.post("/workers/:id/report", (req, res) => {
+  console.log("📄 Worker raporu oluşturuluyor, ID:", req.params.id);
+
+  // Mock PDF response
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=worker-report.pdf"
+  );
+
+  console.log("✅ Worker raporu oluşturuldu");
+  res.send(Buffer.from("Mock PDF content"));
 });
 
 // ================================
@@ -1679,6 +1498,305 @@ router.get("/settings/history", (req, res) => {
 
   console.log("✅ Settings history gönderiliyor:", mockHistory.length, "kayıt");
   res.json(mockHistory);
+});
+
+// PPE stream başlatma
+router.post('/stream/start', async (req, res) => {
+    try {
+        const result = await ppeService.startStream();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PPE stream durdurma
+router.post('/stream/stop', async (req, res) => {
+    try {
+        const result = await ppeService.stopStream();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PPE frame alma
+router.get('/frame', async (req, res) => {
+    try {
+        const frame = await ppeService.getFrame();
+        res.send(frame); // Sadece base64 string gönder
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PPE tespitleri alma
+router.get('/detections', async (req, res) => {
+    try {
+        const detections = await ppeService.getDetections();
+        res.json(detections);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PPE servis sağlık kontrolü
+router.get('/health', async (req, res) => {
+    try {
+        const isHealthy = await ppeService.checkHealth();
+        res.json({ status: isHealthy ? 'healthy' : 'unhealthy' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Mesaj gönderme endpoint'i
+router.post('/messages/send', async (req, res) => {
+    try {
+        console.log('💬 Mesaj gönderiliyor:', req.body);
+        
+        const { workerId, workerName, workerEmail, subject, message, priority, type } = req.body;
+        
+        // Mesaj verisini validate et
+        if (!workerId || !subject || !message) {
+            return res.status(400).json({ 
+                error: 'Worker ID, konu ve mesaj alanları zorunludur' 
+            });
+        }
+        
+        // Mock mesaj gönderme - gerçek implementasyonda e-posta/SMS servisi kullanılabilir
+        const messageData = {
+            id: Date.now(),
+            workerId,
+            workerName,
+            workerEmail,
+            subject,
+            message,
+            priority,
+            type,
+            status: 'sent',
+            sentAt: new Date().toISOString(),
+            readAt: null
+        };
+        
+        // Burada gerçek mesaj gönderme işlemi yapılabilir:
+        // - E-posta gönderme
+        // - SMS gönderme  
+        // - Push notification
+        // - Veritabanına kaydetme
+        
+        console.log('✅ Mesaj başarıyla gönderildi:', workerName);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Mesaj başarıyla gönderildi',
+            data: messageData
+        });
+        
+    } catch (error) {
+        console.error('❌ Mesaj gönderme hatası:', error);
+        res.status(500).json({ 
+            error: 'Mesaj gönderilemedi',
+            details: error.message 
+        });
+    }
+});
+
+// Eğitim planlama endpoint'i
+router.post('/training/schedule', async (req, res) => {
+    try {
+        console.log('📚 Eğitim planlanıyor:', req.body);
+        
+        const { 
+            workerId, 
+            workerName, 
+            title, 
+            description, 
+            type, 
+            duration, 
+            scheduledDate, 
+            location, 
+            instructor, 
+            mandatory 
+        } = req.body;
+        
+        // Eğitim verisini validate et
+        if (!workerId || !title || !scheduledDate) {
+            return res.status(400).json({ 
+                error: 'Worker ID, eğitim başlığı ve tarih alanları zorunludur' 
+            });
+        }
+        
+        // Mock eğitim planlama - gerçek implementasyonda veritabanına kaydedilir
+        const trainingData = {
+            id: Date.now(),
+            workerId,
+            workerName,
+            title,
+            description,
+            type,
+            duration,
+            scheduledDate,
+            location,
+            instructor,
+            mandatory,
+            status: 'scheduled',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            completedAt: null,
+            score: null,
+            feedback: null
+        };
+        
+        // Burada gerçek eğitim planlama işlemi yapılabilir:
+        // - Veritabanına kaydetme
+        // - Takvim entegrasyonu
+        // - Eğitmen bilgilendirme
+        // - Otomatik hatırlatma ayarlama
+        
+        console.log('✅ Eğitim başarıyla planlandı:', workerName, '-', title);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Eğitim başarıyla planlandı',
+            data: trainingData
+        });
+        
+    } catch (error) {
+        console.error('❌ Eğitim planlama hatası:', error);
+        res.status(500).json({ 
+            error: 'Eğitim planlanamadı',
+            details: error.message 
+        });
+    }
+});
+
+// Mesajları listeleme endpoint'i
+router.get('/messages', async (req, res) => {
+    try {
+        console.log('📬 Mesajlar listeleniyor');
+        
+        const { workerId, status, limit = 50 } = req.query;
+        
+        // Mock mesaj listesi
+        const mockMessages = [
+            {
+                id: 1,
+                workerId: 1,
+                workerName: 'Ahmet Yılmaz',
+                subject: 'Güvenlik Eğitimi Hatırlatması',
+                message: 'Yarın saat 14:00\'te güvenlik eğitimine katılmanız gerekmektedir.',
+                priority: 'high',
+                type: 'reminder',
+                status: 'read',
+                sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                readAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+            },
+            {
+                id: 2,
+                workerId: 2,
+                workerName: 'Fatma Demir',
+                subject: 'PPE Eksikliği Uyarısı',
+                message: 'Bugün güvenlik bareti takmamanız tespit edildi. Lütfen dikkat ediniz.',
+                priority: 'medium',
+                type: 'warning',
+                status: 'sent',
+                sentAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+                readAt: null
+            }
+        ];
+        
+        let filteredMessages = mockMessages;
+        
+        if (workerId) {
+            filteredMessages = filteredMessages.filter(msg => msg.workerId == workerId);
+        }
+        
+        if (status) {
+            filteredMessages = filteredMessages.filter(msg => msg.status === status);
+        }
+        
+        filteredMessages = filteredMessages.slice(0, parseInt(limit));
+        
+        console.log('✅ Mesajlar gönderiliyor:', filteredMessages.length, 'adet');
+        res.json(filteredMessages);
+        
+    } catch (error) {
+        console.error('❌ Mesaj listeleme hatası:', error);
+        res.status(500).json({ 
+            error: 'Mesajlar listelenemedi',
+            details: error.message 
+        });
+    }
+});
+
+// Eğitimleri listeleme endpoint'i
+router.get('/training', async (req, res) => {
+    try {
+        console.log('📚 Eğitimler listeleniyor');
+        
+        const { workerId, status, type, limit = 50 } = req.query;
+        
+        // Mock eğitim listesi
+        const mockTrainings = [
+            {
+                id: 1,
+                workerId: 1,
+                workerName: 'Ahmet Yılmaz',
+                title: 'İş Güvenliği Temel Eğitimi',
+                description: 'Temel iş güvenliği kuralları ve PPE kullanımı',
+                type: 'safety',
+                duration: 120,
+                scheduledDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                location: 'Eğitim Salonu A',
+                instructor: 'Mühendis Ali Veli',
+                mandatory: true,
+                status: 'scheduled',
+                createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+                id: 2,
+                workerId: 2,
+                workerName: 'Fatma Demir',
+                title: 'Kimyasal Güvenlik Eğitimi',
+                description: 'Kimyasal madde kullanımı ve güvenlik önlemleri',
+                type: 'chemical',
+                duration: 90,
+                scheduledDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                location: 'Laboratuvar',
+                instructor: 'Dr. Ayşe Kaya',
+                mandatory: true,
+                status: 'scheduled',
+                createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+            }
+        ];
+        
+        let filteredTrainings = mockTrainings;
+        
+        if (workerId) {
+            filteredTrainings = filteredTrainings.filter(training => training.workerId == workerId);
+        }
+        
+        if (status) {
+            filteredTrainings = filteredTrainings.filter(training => training.status === status);
+        }
+        
+        if (type) {
+            filteredTrainings = filteredTrainings.filter(training => training.type === type);
+        }
+        
+        filteredTrainings = filteredTrainings.slice(0, parseInt(limit));
+        
+        console.log('✅ Eğitimler gönderiliyor:', filteredTrainings.length, 'adet');
+        res.json(filteredTrainings);
+        
+    } catch (error) {
+        console.error('❌ Eğitim listeleme hatası:', error);
+        res.status(500).json({ 
+            error: 'Eğitimler listelenemedi',
+            details: error.message 
+        });
+    }
 });
 
 module.exports = router;

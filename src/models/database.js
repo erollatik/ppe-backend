@@ -119,6 +119,84 @@ const DetectionResult = sequelize.define('DetectionResult', {
   }
 });
 
+// Worker Model
+const Worker = sequelize.define('Worker', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  workerId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  email: {
+    type: DataTypes.STRING,
+    validate: {
+      isEmail: true
+    }
+  },
+  phone: {
+    type: DataTypes.STRING
+  },
+  department: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  position: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  location: {
+    type: DataTypes.STRING
+  },
+  manager: {
+    type: DataTypes.STRING
+  },
+  startDate: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  status: {
+    type: DataTypes.ENUM('active', 'inactive', 'training'),
+    defaultValue: 'active'
+  },
+  photo: {
+    type: DataTypes.TEXT // Base64 encoded image
+  },
+  assignedPPE: {
+    type: DataTypes.JSON, // Array of PPE types
+    defaultValue: []
+  },
+  complianceRate: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0
+  },
+  lastSeen: {
+    type: DataTypes.DATE
+  },
+  monthlyViolations: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  totalViolations: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  trainingCompleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  notes: {
+    type: DataTypes.TEXT
+  }
+});
+
 // İlişkiler
 User.hasMany(Detection, { foreignKey: 'userId' });
 Detection.belongsTo(User, { foreignKey: 'userId' });
@@ -130,5 +208,6 @@ module.exports = {
   sequelize,
   User,
   Detection,
-  DetectionResult
+  DetectionResult,
+  Worker
 };
